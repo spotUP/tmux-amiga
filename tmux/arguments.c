@@ -184,8 +184,10 @@ args_parse_flag_argument(struct args_value *values, u_int count, char **cause,
 	(*i)++;
 
 out:
-	s = args_value_as_string(new);
-	log_debug("%s: -%c = %s", __func__, flag, s);
+	if (log_get_level() != 0) {	/* a { commands } value prints whole */
+		s = args_value_as_string(new);
+		log_debug("%s: -%c = %s", __func__, flag, s);
+	}
 	args_set(args, flag, new, 0);
 	return (0);
 }
@@ -269,9 +271,14 @@ args_parse(const struct args_parse *parse, struct args_value *values,
 		for (/* nothing */; i < count; i++) {
 			value = &values[i];
 
-			s = args_value_as_string(value);
-			log_debug("%s: %u = %s (type %s)", __func__, i, s,
-			    args_type_to_string (value->type));
+			/* only for the log: as a string, a { commands } value is
+			   its whole command list printed (seconds at start-up on
+			   a 68020 for the default key bindings) */
+			if (log_get_level() != 0) {
+				s = args_value_as_string(value);
+				log_debug("%s: %u = %s (type %s)", __func__, i, s,
+				    args_type_to_string (value->type));
+			}
 
 			if (parse->cb != NULL) {
 				type = parse->cb(args, args->count, cause);

@@ -460,17 +460,25 @@ cmd_find(const char *name, char **cause)
 	const struct cmd_entry	**loop, *entry, *found = NULL;
 	int			  ambiguous;
 	char			  s[8192];
+	size_t			  namelen = strlen(name);
 
+	/*
+	 * The first character is compared here, so most entries cost no
+	 * string call: every command of every default key binding comes
+	 * through here at server start (seconds on a 68020).
+	 */
 	ambiguous = 0;
 	for (loop = cmd_table; *loop != NULL; loop++) {
 		entry = *loop;
-		if (entry->alias != NULL && strcmp(entry->alias, name) == 0) {
+		if (entry->alias != NULL && entry->alias[0] == name[0] &&
+		    strcmp(entry->alias, name) == 0) {
 			ambiguous = 0;
 			found = entry;
 			break;
 		}
 
-		if (strncmp(entry->name, name, strlen(name)) != 0)
+		if ((namelen != 0 && entry->name[0] != name[0]) ||
+		    strncmp(entry->name, name, namelen) != 0)
 			continue;
 		if (found != NULL)
 			ambiguous = 1;
