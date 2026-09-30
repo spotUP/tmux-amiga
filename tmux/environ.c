@@ -222,6 +222,43 @@ environ_push(struct environ *env)
 	}
 }
 
+#ifdef TMUX_AMIGA
+/*
+ * The environment as an envp array, what environ_push would leave in
+ * environ: a vfork child must not build its own (amiga/vspawn.c).
+ */
+char **
+environ_envp(struct environ *env)
+{
+	struct environ_entry	*envent;
+	char			**envp;
+	u_int			  n = 0;
+
+	RB_FOREACH(envent, environ, env)
+		n++;
+	envp = xcalloc(n + 1, sizeof *envp);
+	n = 0;
+	RB_FOREACH(envent, environ, env) {
+		if (envent->value != NULL &&
+		    *envent->name != '\0' &&
+		    (~envent->flags & ENVIRON_HIDDEN))
+			xasprintf(&envp[n++], "%s=%s", envent->name,
+			    envent->value);
+	}
+	return (envp);
+}
+
+void
+environ_envp_free(char **envp)
+{
+	char	**p;
+
+	for (p = envp; *p != NULL; p++)
+		free(*p);
+	free(envp);
+}
+#endif
+
 /* Log the environment. */
 void
 environ_log(struct environ *env, const char *fmt, ...)

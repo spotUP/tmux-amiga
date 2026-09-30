@@ -29,6 +29,10 @@
 
 #include "tmux.h"
 
+#ifdef TMUX_AMIGA
+#include "vspawn.h"
+#endif
+
 /*
  * Open pipe to redirect pane output. If already open, close first.
  */
@@ -123,7 +127,38 @@ cmd_pipe_pane_exec(struct cmd *self, struct cmdq_item *item)
 	/* Fork the child. */
 	sigfillset(&set);
 	sigprocmask(SIG_BLOCK, &set, &oldset);
+#ifdef TMUX_AMIGA
+	/* AmigaOS: no fork; the child is prepared here (amiga/vspawn.c) */
+	{
+		struct amiga_child	 ac;
+		char			*shargv[] = { "sh", "-c", cmd, NULL };
+		pid_t			 pid;
+
+		memset(&ac, 0, sizeof ac);
+		ac.path = _PATH_BSHELL;
+		ac.argv = shargv;
+		ac.envp = environ;	/* the server's own, as fork kept it */
+		ac.tty = NULL;
+		ac.verase = -1;
+		ac.fd[0] = out ? pipe_fd[1] : -2;
+		ac.fd[1] = in ? pipe_fd[1] : -2;
+		ac.fd[2] = -2;
+		ac.close_fd = pipe_fd[0];
+		ac.mask = &oldset;
+		pid = amiga_vspawn(&ac);
+		if (pid == -1) {
+			sigprocmask(SIG_SETMASK, &oldset, NULL);
+			cmdq_error(item, "fork error: %s", strerror(errno));
+			close(pipe_fd[0]);
+			close(pipe_fd[1]);
+			free(cmd);
+			return (CMD_RETURN_ERROR);
+		}
+	}
+	switch (1) {
+#else
 	switch (fork()) {
+#endif
 	case -1:
 		sigprocmask(SIG_SETMASK, &oldset, NULL);
 		cmdq_error(item, "fork error: %s", strerror(errno));

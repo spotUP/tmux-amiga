@@ -287,6 +287,12 @@ client_main(struct event_base *base, int argc, char **argv, uint64_t flags,
 		fd = server_start(client_proc, flags, base, 0, NULL);
 	} else
 #endif
+#ifdef TMUX_AMIGA
+	/* the server started again by proc_fork_and_daemon: it is the server */
+	if (getenv("TMUX_AMIGA_SERVER") != NULL)
+		fd = server_start(client_proc, flags, base, -1, NULL);
+	else
+#endif
 	fd = client_connect(base, socket_path, client_flags);
 	if (fd == -1) {
 		if (errno == ECONNREFUSED) {

@@ -346,6 +346,10 @@ getversion(void)
 	return (TMUX_VERSION);
 }
 
+#ifdef TMUX_AMIGA
+char	**amiga_argv;
+#endif
+
 int
 main(int argc, char **argv)
 {
@@ -357,6 +361,16 @@ main(int argc, char **argv)
 	const struct options_table_entry	*oe;
 	u_int					 i;
 
+#ifdef TMUX_AMIGA
+	/*
+	 * ixemul has no locales: tmux's UTF-8 is its own (amiga/utf8proc.c,
+	 * the widths of the vtcon console). The server starts as this program
+	 * again, with these arguments (proc.c).
+	 */
+	amiga_argv = argv;
+	setlocale(LC_CTYPE, "");
+	if (0)
+#endif
 	if (setlocale(LC_CTYPE, "en_US.UTF-8") == NULL &&
 	    setlocale(LC_CTYPE, "C.UTF-8") == NULL) {
 		if (setlocale(LC_CTYPE, "") == NULL)

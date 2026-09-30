@@ -33,6 +33,12 @@
 
 #include "tmux.h"
 
+#ifdef TMUX_AMIGA
+#include <fcntl.h>
+#include <paths.h>
+#include <stdio.h>
+#endif
+
 struct tmuxproc {
 	const char	 *name;
 	int		  exit;
@@ -355,6 +361,56 @@ proc_toggle_log(struct tmuxproc *tp)
 	log_toggle(tp->name);
 }
 
+#ifdef TMUX_AMIGA
+/*
+ * AmigaOS: no fork. The server is this program started again (vfork +
+ * exec) with TMUX_AMIGA_SERVER naming its end of the socketpair; there
+ * client_main calls server_start at once, and here the new process takes
+ * the child's side. daemon(): its own session, stdio on /dev/null.
+ */
+pid_t
+proc_fork_and_daemon(int *fd)
+{
+	const char	*env = getenv("TMUX_AMIGA_SERVER");
+	char		 self[1024], num[16];
+	pid_t		 pid;
+	int		 pair[2], nfd;
+
+	if (env != NULL) {
+		*fd = atoi(env);
+		/* main copied the environment already: out of both, or every
+		   pane inherits it */
+		environ_unset(global_environ, "TMUX_AMIGA_SERVER");
+		unsetenv("TMUX_AMIGA_SERVER");
+		setsid();
+		if ((nfd = open(_PATH_DEVNULL, O_RDWR)) != -1) {
+			dup2(nfd, STDIN_FILENO);
+			dup2(nfd, STDOUT_FILENO);
+			dup2(nfd, STDERR_FILENO);
+			if (nfd > STDERR_FILENO)
+				close(nfd);
+		}
+		return (0);
+	}
+	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, pair) != 0)
+		fatal("socketpair failed");
+	ix_self_path(self, sizeof self, amiga_argv[0]);
+	snprintf(num, sizeof num, "%d", pair[1]);
+	setenv("TMUX_AMIGA_SERVER", num, 1);
+	pid = vfork();
+	if (pid == 0) {
+		close(pair[0]);
+		execv(self, amiga_argv);
+		_exit(1);
+	}
+	unsetenv("TMUX_AMIGA_SERVER");
+	if (pid == -1)
+		fatal("vfork failed");
+	close(pair[1]);
+	*fd = pair[0];
+	return (pid);
+}
+#else
 pid_t
 proc_fork_and_daemon(int *fd)
 {
@@ -378,6 +434,7 @@ proc_fork_and_daemon(int *fd)
 		return (pid);
 	}
 }
+#endif /* TMUX_AMIGA */
 
 uid_t
 proc_get_peer_uid(struct tmuxpeer *peer)

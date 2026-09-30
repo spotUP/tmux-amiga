@@ -2491,7 +2491,14 @@ void	environ_clear(struct environ *, const char *);
 void	environ_put(struct environ *, const char *, int);
 void	environ_unset(struct environ *, const char *);
 void	environ_update(struct options *, struct environ *, struct environ *);
+#ifdef TMUX_AMIGA
+extern char	**amiga_argv;	/* tmux.c: main's, to start the server again */
+#endif
 void	environ_push(struct environ *);
+#ifdef TMUX_AMIGA
+char  **environ_envp(struct environ *);
+void	environ_envp_free(char **);
+#endif
 void printflike(2, 3) environ_log(struct environ *, const char *, ...);
 struct environ *environ_for_session(struct session *, int);
 

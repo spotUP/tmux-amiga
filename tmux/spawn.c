@@ -26,6 +26,11 @@
 
 #include "tmux.h"
 
+#ifdef TMUX_AMIGA
+#include <sys/stat.h>
+#include "vspawn.h"
+#endif
+
 /*
  * Set up the environment and create a new window and pane or a new pane.
  *
@@ -366,6 +371,97 @@ spawn_pane(struct spawn_context *sc, char **cause)
 		goto complete;
 	}
 
+#ifdef TMUX_AMIGA
+	/*
+	 * AmigaOS: no fork. Everything the child needs is made here -- the
+	 * directory, the environment, the arguments, the pty -- and the child
+	 * (amiga/vspawn.c) only makes the slave its terminal and execs.
+	 */
+	{
+		struct amiga_child	 ac;
+		const char		*dir = NULL;
+		char			**envp, **argvp = NULL, *argv0 = NULL;
+		char			*shargv[4];
+		struct stat		 sb;
+
+		if (amiga_openpty(&new_wp->fd, new_wp->tty,
+		    sizeof new_wp->tty) != 0) {
+			xasprintf(cause, "no free pty: %s", strerror(errno));
+			new_wp->fd = -1;
+			if (~sc->flags & SPAWN_RESPAWN) {
+				server_client_remove_pane(new_wp);
+				layout_close_pane(new_wp);
+				window_remove_pane(w, new_wp);
+			}
+			sigprocmask(SIG_SETMASK, &oldset, NULL);
+			environ_free(child);
+			return (NULL);
+		}
+		ioctl(new_wp->fd, TIOCSWINSZ, &ws);
+
+		if (stat(new_wp->cwd, &sb) == 0 && S_ISDIR(sb.st_mode))
+			dir = new_wp->cwd;
+		else if ((tmp = find_home()) != NULL)
+			dir = tmp;
+		else
+			dir = "/";
+		environ_set(child, "PWD", 0, "%s", dir);
+		envp = environ_envp(child);
+
+		memset(&ac, 0, sizeof ac);
+		cp = strrchr(new_wp->shell, '/');
+		if (new_wp->argc != 0 && new_wp->argc != 1) {
+			argvp = cmd_copy_argv(new_wp->argc, new_wp->argv);
+			ac.path = argvp[0];
+			ac.argv = argvp;
+			ac.use_path = 1;
+		} else {
+			if (cp != NULL && cp[1] != '\0')
+				xasprintf(&argv0, "%s%s",
+				    new_wp->argc == 1 ? "" : "-", cp + 1);
+			else
+				xasprintf(&argv0, "%s%s",
+				    new_wp->argc == 1 ? "" : "-", new_wp->shell);
+			shargv[0] = argv0;
+			shargv[1] = new_wp->argc == 1 ? "-c" : NULL;
+			shargv[2] = new_wp->argc == 1 ? new_wp->argv[0] : NULL;
+			shargv[3] = NULL;
+			ac.path = new_wp->shell;
+			ac.argv = shargv;
+		}
+		ac.envp = envp;
+		ac.cwd = dir;
+		ac.tty = new_wp->tty;
+		ac.cc = s->tio != NULL ? s->tio->c_cc : NULL;
+		key = options_get_number(global_options, "backspace");
+		ac.verase = key >= 0x7f ? '\177' : (int)key;
+		ac.fd[0] = ac.fd[1] = ac.fd[2] = -1;
+		ac.close_fd = new_wp->fd;
+		ac.mask = &oldset;
+
+		new_wp->pid = amiga_vspawn(&ac);
+		if (new_wp->pid == -1) {
+			xasprintf(cause, "vfork failed: %s", strerror(errno));
+			close(new_wp->fd);
+			new_wp->fd = -1;
+		}
+		environ_envp_free(envp);
+		if (argvp != NULL)
+			cmd_free_argv(new_wp->argc, argvp);
+		free(argv0);
+		if (new_wp->pid == -1) {
+			if (~sc->flags & SPAWN_RESPAWN) {
+				server_client_remove_pane(new_wp);
+				layout_close_pane(new_wp);
+				window_remove_pane(w, new_wp);
+			}
+			sigprocmask(SIG_SETMASK, &oldset, NULL);
+			environ_free(child);
+			return (NULL);
+		}
+		goto complete;
+	}
+#else
 	/* Fork the new process. */
 	new_wp->pid = fdforkpty(ptm_fd, &new_wp->fd, new_wp->tty, NULL, &ws);
 	if (new_wp->pid == -1) {
@@ -465,6 +561,8 @@ spawn_pane(struct spawn_context *sc, char **cause)
 		xasprintf(&argv0, "-%s", new_wp->shell);
 	execl(new_wp->shell, argv0, (char *)NULL);
 	_exit(1);
+
+#endif /* TMUX_AMIGA */
 
 complete:
 #ifdef HAVE_UTEMPTER

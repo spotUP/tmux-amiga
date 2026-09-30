@@ -29,6 +29,11 @@
 
 #include "tmux.h"
 
+#ifdef TMUX_AMIGA
+#include <sys/stat.h>
+#include "vspawn.h"
+#endif
+
 /*
  * Job scheduling. Run queued commands in the background and record their
  * output.
@@ -109,6 +114,84 @@ job_run(const char *cmd, int argc, char **argv, struct environ *e,
 	sigfillset(&set);
 	sigprocmask(SIG_BLOCK, &set, &oldset);
 
+#ifdef TMUX_AMIGA
+	/* AmigaOS: no fork; the child is prepared here (amiga/vspawn.c) */
+	{
+		struct amiga_child	 ac;
+		char			**envp, *shargv[4];
+		struct stat		 sb;
+
+		memset(&ac, 0, sizeof ac);
+		ac.fd[0] = ac.fd[1] = ac.fd[2] = -1;
+		ac.close_fd = -1;
+		ac.verase = -1;
+		if (flags & JOB_PTY) {
+			if (amiga_openpty(&master, tty, sizeof tty) != 0)
+				goto fail;
+			memset(&ws, 0, sizeof ws);
+			ws.ws_col = sx;
+			ws.ws_row = sy;
+			ioctl(master, TIOCSWINSZ, &ws);
+			ac.tty = tty;
+			ac.close_fd = master;
+		} else {
+			if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, out) != 0)
+				goto fail;
+			ac.fd[0] = ac.fd[1] = out[1];
+			ac.fd[2] = (flags & JOB_SHOWSTDERR) ? out[1] : -2;
+			ac.close_fd = out[0];
+		}
+		if (cwd != NULL) {
+			if (stat(cwd, &sb) == 0 && S_ISDIR(sb.st_mode))
+				ac.cwd = cwd;
+			else if ((home = find_home()) != NULL)
+				ac.cwd = home;
+			else
+				ac.cwd = "/";
+			environ_set(env, "PWD", 0, "%s", ac.cwd);
+		}
+		if (cmd != NULL && (flags & JOB_DEFAULTSHELL))
+			environ_set(env, "SHELL", 0, "%s", shell);
+		envp = environ_envp(env);
+		argvp = NULL;
+		if (cmd != NULL) {
+			shargv[0] = argv0;
+			shargv[1] = "-c";
+			shargv[2] = (char *)cmd;
+			shargv[3] = NULL;
+			ac.path = shell;
+			ac.argv = shargv;
+		} else {
+			argvp = cmd_copy_argv(argc, argv);
+			ac.path = argvp[0];
+			ac.argv = argvp;
+			ac.use_path = 1;
+		}
+		ac.envp = envp;
+		ac.mask = &oldset;
+		pid = amiga_vspawn(&ac);
+		environ_envp_free(envp);
+		if (argvp != NULL)
+			cmd_free_argv(argc, argvp);
+		if (cmd == NULL) {
+			cmd_log_argv(argc, argv, "%s:", __func__);
+			log_debug("%s: cwd=%s, shell=%s", __func__,
+			    cwd == NULL ? "" : cwd, shell);
+		} else {
+			log_debug("%s: cmd=%s, cwd=%s, shell=%s", __func__, cmd,
+			    cwd == NULL ? "" : cwd, shell);
+		}
+		if (pid == -1) {
+			if (flags & JOB_PTY)
+				close(master);
+			else {
+				close(out[0]);
+				close(out[1]);
+			}
+			goto fail;
+		}
+	}
+#else
 	if (flags & JOB_PTY) {
 		memset(&ws, 0, sizeof ws);
 		ws.ws_col = sx;
@@ -190,6 +273,8 @@ job_run(const char *cmd, int argc, char **argv, struct environ *e,
 			fatal("execvp failed");
 		}
 	}
+
+#endif /* TMUX_AMIGA */
 
 	sigprocmask(SIG_SETMASK, &oldset, NULL);
 	environ_free(env);

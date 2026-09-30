@@ -10,9 +10,10 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/wait.h>
+#include <fcntl.h>
 #include <event2/event.h>
 
-static int timer_hits, read_bytes, sigchld_hits, passed, total;
+static int timer_hits, read_bytes, sigchld_hits, write_hits, passed, total;
 static struct event_base *base;
 
 static void check(int ok, const char *what)
@@ -45,6 +46,13 @@ static void on_sigchld(evutil_socket_t sig, short ev, void *arg)
         sigchld_hits++;
 }
 
+static void on_write(evutil_socket_t fd, short ev, void *arg)
+{
+    (void)ev; (void)arg;
+    write(fd, "[write event]\n", 14);
+    write_hits++;
+}
+
 static void on_done(evutil_socket_t fd, short ev, void *arg)
 {
     (void)fd; (void)ev; (void)arg;
@@ -74,6 +82,15 @@ int main(void)
     d = event_new(base, -1, 0, on_done, NULL);
     event_add(d, &tv2s);
 
+    {
+        /* a write event on the terminal (tmux draws through one) */
+        int tty = open("/dev/tty", O_RDWR);
+        check(tty >= 0, "open /dev/tty");
+        if (tty >= 0) {
+            struct event *w = event_new(base, tty, EV_WRITE, on_write, NULL);
+            event_add(w, NULL);
+        }
+    }
     write(sv[1], "hello", 5);
     pid = vfork();
     if (pid == 0)
@@ -83,6 +100,7 @@ int main(void)
     check(timer_hits == 1, "the 200 ms timer fired once");
     check(read_bytes == 5, "the socketpair read event got 5 bytes");
     check(sigchld_hits == 1, "SIGCHLD from the vfork child, reaped");
+    check(write_hits == 1, "the write event on /dev/tty fired");
     printf("evprobe: passed %d of %d\n", passed, total);
     return passed == total ? 0 : 10;
 }
