@@ -368,6 +368,20 @@ main(int argc, char **argv)
 	 * again, with these arguments (proc.c).
 	 */
 	amiga_argv = argv;
+	if (getenv("TMUX_AMIGA_SERVER") != NULL) {
+		sigset_t	none;
+
+		/*
+		 * The server started again: it inherits the mask server_start
+		 * set (everything blocked) before it started it. After a fork
+		 * the child goes on from there and restores the mask it saved;
+		 * this process starts server_start from the top, would save
+		 * "everything blocked" and restore that -- SIGTERM (kill-server)
+		 * and SIGCHLD never arrived. Start as the client started.
+		 */
+		sigemptyset(&none);
+		sigprocmask(SIG_SETMASK, &none, NULL);
+	}
 	setlocale(LC_CTYPE, "");
 	if (0)
 #endif
