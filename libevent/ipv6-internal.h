@@ -66,6 +66,9 @@ struct sockaddr_in6 {
 	sa_family_t sin6_family;
 	ev_uint16_t sin6_port;
 	struct in6_addr sin6_addr;
+	/* evutil.c sets it unconditionally (a system without IPv6: AmigaOS
+	 * ixemul) */
+	ev_uint32_t sin6_scope_id;
 };
 #endif
 

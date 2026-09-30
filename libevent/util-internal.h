@@ -38,6 +38,11 @@
 #ifdef EVENT__HAVE_SYS_SOCKET_H
 #include <sys/socket.h>
 #endif
+#ifdef EVENT__HAVE_NETINET_IN_H
+/* struct sockaddr_in below: glibc's <netdb.h> brings it, POSIX only may
+ * (AmigaOS ixemul's does not) */
+#include <netinet/in.h>
+#endif
 #ifdef EVENT__HAVE_SYS_EVENTFD_H
 #include <sys/eventfd.h>
 #endif
