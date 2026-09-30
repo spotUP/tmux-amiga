@@ -728,6 +728,11 @@ cmd_parse_log_commands(struct cmd_parse_commands *cmds, const char *prefix)
 	u_int				 i, j;
 	char				*s;
 
+	/* only for the log: walking and printing every command costs
+	   seconds on a slow machine when nobody reads it */
+	if (log_get_level() == 0)
+		return;
+
 	i = 0;
 	TAILQ_FOREACH(cmd, cmds, entry) {
 		j = 0;
@@ -920,9 +925,11 @@ cmd_parse_build_commands(struct cmd_parse_commands *cmds,
 		cmd_list_free(current);
 	}
 
-	s = cmd_list_print(result, 0);
-	log_debug("%s: %s", __func__, s);
-	free(s);
+	if (log_get_level() != 0) {
+		s = cmd_list_print(result, 0);
+		log_debug("%s: %s", __func__, s);
+		free(s);
+	}
 
 	pr->status = CMD_PARSE_SUCCESS;
 	pr->cmdlist = result;
@@ -1156,12 +1163,29 @@ yylex_is_var(char ch, int first)
 	return (isalnum((u_char)ch) || ch == '_');
 }
 
+static size_t
+yylex_alloc_size(size_t len)
+{
+	size_t	size = 32;
+
+	/* what a buffer of len bytes (and its terminator) was given below:
+	   doubling, so a token costs a few reallocs, not one per character */
+	while (size < len + 1)
+		size *= 2;
+	return (size);
+}
+
 static void
 yylex_append(char **buf, size_t *len, const char *add, size_t addlen)
 {
+	size_t	have, need;
+
 	if (addlen > SIZE_MAX - 1 || *len > SIZE_MAX - 1 - addlen)
 		fatalx("buffer is too big");
-	*buf = xrealloc(*buf, (*len) + 1 + addlen);
+	have = (*len == 0) ? 1 : yylex_alloc_size(*len);  /* callers start with xmalloc(1) */
+	need = (*len) + 1 + addlen;
+	if (need > have)
+		*buf = xrealloc(*buf, yylex_alloc_size(need - 1));
 	memcpy((*buf) + *len, add, addlen);
 	(*len) += addlen;
 }

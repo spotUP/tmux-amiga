@@ -237,6 +237,8 @@ cmd_log_argv(int argc, char **argv, const char *fmt, ...)
 	va_list	 ap;
 	int	 i;
 
+	if (log_get_level() == 0)
+		return;
 	va_start(ap, fmt);
 	xvasprintf(&prefix, fmt, ap);
 	va_end(ap);
@@ -653,9 +655,11 @@ cmd_list_copy(const struct cmd_list *cmdlist, int argc, char **argv)
 	u_int		 group = cmdlist->group;
 	char		*s;
 
-	s = cmd_list_print(cmdlist, 0);
-	log_debug("%s: %s", __func__, s);
-	free(s);
+	if (log_get_level() != 0) {
+		s = cmd_list_print(cmdlist, 0);
+		log_debug("%s: %s", __func__, s);
+		free(s);
+	}
 
 	new_cmdlist = cmd_list_new();
 	TAILQ_FOREACH(cmd, cmdlist->list, qentry) {
@@ -667,9 +671,11 @@ cmd_list_copy(const struct cmd_list *cmdlist, int argc, char **argv)
 		cmd_list_append(new_cmdlist, new_cmd);
 	}
 
-	s = cmd_list_print(new_cmdlist, 0);
-	log_debug("%s: %s", __func__, s);
-	free(s);
+	if (log_get_level() != 0) {
+		s = cmd_list_print(new_cmdlist, 0);
+		log_debug("%s: %s", __func__, s);
+		free(s);
+	}
 
 	return (new_cmdlist);
 }
