@@ -1,9 +1,12 @@
 # tmux 3.6a and libevent 2.1.12 for AmigaOS 3.x + ixemul 48.2 (UP-Term).
 # bebbo's gcc, GG ncurses 5.5 (the rig's), vtcon's libixcompat. amiga/
 # holds the hand-written configuration (configure does not run for m68k).
+# The workspace directory that holds this repo and its siblings (the upterm
+# meta-repo creates it); the sibling defaults below hang off it.
+UPTERM_ROOT ?= $(abspath $(CURDIR)/..)
 AGCC    ?= $(HOME)/opt/amiga/bin/m68k-amigaos-gcc
 AAR     ?= $(HOME)/opt/amiga/bin/m68k-amigaos-ar
-NCURSES ?= $(HOME)/Code/vtcon/build/rig/vtc/pkgs/ncurses-5.5-1-p-bin-m68k
+NCURSES ?= $(UPTERM_ROOT)/vtcon/build/rig/vtc/pkgs/ncurses-5.5-1-p-bin-m68k
 CFLAGS  = -mcrt=ixemul -O2 -fgnu89-inline -Wall -Wno-unused -Wno-pointer-sign
 B       = build
 
@@ -30,7 +33,7 @@ $(B)/libevent.a: $(EV_OBJS)
 # tmux: its sources (Makefile.am's dist_tmux_SOURCES, cmd-parse.c as the
 # tarball has it generated, osdep-unknown.c), the compat/ files for what
 # ixemul lacks, and the AmigaOS pieces in amiga/.
-VTCON   ?= $(HOME)/Code/vtcon
+VTCON   ?= $(UPTERM_ROOT)/vtcon
 TM_SRCS = alerts.c arguments.c attributes.c cfg.c client.c cmd-attach-session.c \
           cmd-bind-key.c cmd-break-pane.c cmd-capture-pane.c cmd-choose-tree.c cmd-command-prompt.c cmd-confirm-before.c \
           cmd-copy-mode.c cmd-detach-client.c cmd-display-menu.c cmd-display-message.c cmd-display-panes.c cmd-find-window.c \
