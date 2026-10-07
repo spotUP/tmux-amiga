@@ -73,4 +73,4 @@ $(B)/tmux/amiga/%.o: amiga/%.c amiga/tmux/config.h
 	$(AGCC) $(CFLAGS) $(TM_DEFS) $(TM_INC) -c -o $@ $<
 
 $(B)/tmux-bin: $(TM_OBJS) $(B)/libevent.a
-	$(AGCC) -mcrt=ixemul -o $@ $(TM_OBJS) $(B)/libevent.a -L$(NCURSES)/lib -lncurses -lixcompat
+	$(AGCC) -mcrt=ixemul -s -o $@ $(TM_OBJS) $(B)/libevent.a -L$(NCURSES)/lib -lncurses -lixcompat
