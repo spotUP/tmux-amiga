@@ -63,7 +63,7 @@ TM_SRCS = alerts.c arguments.c attributes.c cfg.c client.c cmd-attach-session.c 
 TM_COMPAT = asprintf.c base64.c clock_gettime.c closefrom.c err.c explicit_bzero.c freezero.c getdtablecount.c getpeereid.c getprogname.c htonll.c ntohll.c imsg.c imsg-buffer.c memmem.c reallocarray.c recallocarray.c setproctitle.c strcasestr.c strlcat.c strlcpy.c strndup.c strnlen.c strtonum.c vis.c unvis.c getopt_long.c
 TM_OBJS = $(addprefix $(B)/tmux/,$(TM_SRCS:.c=.o)) \
           $(addprefix $(B)/tmux/compat/,$(TM_COMPAT:.c=.o)) $(B)/tmux/amiga/utf8proc.o \
-          $(B)/tmux/amiga/vspawn.o $(B)/tmux/amiga/stack.o
+          $(B)/tmux/amiga/vspawn.o $(B)/tmux/amiga/console.o $(B)/tmux/amiga/stack.o
 TM_INC  = -Iamiga/tmux -Iamiga -Itmux -Itmux/compat $(EV_INC) -I$(NCURSES)/include -I$(NCURSES)/include/ncurses \
           -I$(VTCON)/engine
 TM_DEFS = -DHAVE_CONFIG_H -include amiga/tmux/config.h

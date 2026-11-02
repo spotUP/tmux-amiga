@@ -28,6 +28,8 @@ struct amiga_child {
 
 /* The child's pid, or -1 with errno set. */
 pid_t	amiga_vspawn(const struct amiga_child *);
+/* the calling process's console ("*", CONSOLE:) is the stream on fd */
+void	amiga_console_from_fd(int);
 
 /* A free pty pair (BSD names /dev/ptyXY, /dev/ttyXY on vtcon's PTY:): the
  * master open read/write, the slave's name in name (TTY_NAME_MAX). */

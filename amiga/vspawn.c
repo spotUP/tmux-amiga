@@ -34,10 +34,20 @@ amiga_vspawn(const struct amiga_child *c)
 			close(0);
 			close(1);
 			close(2);
-			if (open(c->tty, O_RDWR) != 0)
-				_exit(1);
-			dup(0);
-			dup(0);
+			/* One open per stream, never dup(0): ixemul hands a
+			   native command fd 0 and fd 1 as its Input() and
+			   Output(), and dup'd fds share one DOS FileHandle.
+			   A shell reading that handle buffered leaves its
+			   buffer in read state, and every buffered write
+			   (FPuts, VPrintf: C:Type, C:List, C:Version) is
+			   then dropped. A Shell window gives each stream its
+			   own handle; so does this. */
+			for (i = 0; i < 3; i++)
+				if (open(c->tty, O_RDWR) != i)
+					_exit(1);
+			/* "*" and CONSOLE: are the pane, not the window tmux
+			   was started from */
+			amiga_console_from_fd(0);
 #ifdef TIOCSCTTY
 			ioctl(0, TIOCSCTTY, (char *)0);
 #endif
